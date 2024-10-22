@@ -4,7 +4,7 @@ import * as faceapi from 'face-api.js';
 import io from 'socket.io-client';
 
 // const socket = io.connect('http://localhost:5000');
-const socket = io("https://video-chat-backend-theta.vercel.app/", {
+const socket = io("https://video-chat-backend2-becc66113081.herokuapp.com/", {
   transports: ["websocket"], // Puedes probar con 'websocket' para ver si funciona mejor
   secure: true
 });
@@ -90,7 +90,7 @@ const VideoChat = () => {
 
   return (
     <div>
-      <h1>2Video Chat con Reconocimiento Facial</h1>
+      <h1>3Video Chat con Reconocimiento Facial</h1>
 
       <video ref={myVideoRef} autoPlay muted style={{ width: '300px' }} />
       <video ref={userVideoRef} autoPlay style={{ width: '300px' }} />
