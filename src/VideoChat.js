@@ -40,6 +40,7 @@ const VideoChat = () => {
     // Obtén el ID del usuario al conectarse
     socket.on('me', (id) => {
       setMe(id);
+      socket.emit('join'); // Emitir evento 'join' al conectarse
     });
 
     // Escuchar el ID del compañero
@@ -85,7 +86,7 @@ const VideoChat = () => {
     });
 
     socket.on('signal', (signalData) => {
-      console.log('Signal recibido de:', signalData.to);
+      console.log('Signal recibido de:', signalData.from);
       newPeer.signal(signalData.signal);
     });
 
@@ -94,7 +95,7 @@ const VideoChat = () => {
 
   return (
     <div>
-      <h1>final Video Chat con Reconocimiento Facial</h1>
+      <h1>yes Video Chat con Reconocimiento Facial</h1>
 
       <video ref={myVideoRef} autoPlay muted style={{ width: '300px' }} />
       <video ref={userVideoRef} autoPlay style={{ width: '300px' }} />
