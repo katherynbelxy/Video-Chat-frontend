@@ -4,8 +4,8 @@ import * as faceapi from 'face-api.js';
 import io from 'socket.io-client';
 
 // const socket = io.connect('http://localhost:5000');
-const socket = io("https://video-chat-backend-theta.vercel.app", {
-  transports: ["websocket", "polling"], // Asegúrate de tener ambas opciones
+const socket = io("wss://video-chat-backend-theta.vercel.app", {
+  transports: ["websocket", "polling"],
   secure: true
 });
 
