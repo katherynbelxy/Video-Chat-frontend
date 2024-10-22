@@ -3,7 +3,6 @@ import Peer from 'simple-peer';
 import * as faceapi from 'face-api.js';
 import io from 'socket.io-client';
 
-// Cambia la URL aquí según dónde esté tu backend
 const socket = io("https://video-chat-backend2-becc66113081.herokuapp.com/", {
   transports: ["websocket"],
   secure: true
@@ -19,6 +18,7 @@ const VideoChat = () => {
   const [detections, setDetections] = useState(null);
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [partnerId, setPartnerId] = useState("");
+  const [isInitiator, setIsInitiator] = useState(false);
 
   const loadModels = async () => {
     console.log('Cargando modelos de face-api...');
@@ -32,16 +32,16 @@ const VideoChat = () => {
   useEffect(() => {
     loadModels();
 
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-      .then(stream => {
-        console.log('Stream de medios obtenido');
-        setStream(stream);
-        myVideoRef.current.srcObject = stream;
-        socket.emit('join'); // Emitir evento join al conectarse
-      })
-      .catch(err => {
-        console.error('Error al obtener el stream de medios:', err);
-      });
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
+      console.log('Stream de medios obtenido:', stream);
+      setStream(stream);
+      myVideoRef.current.srcObject = stream;
+
+      // Unirse automáticamente al chat al obtener el stream
+      socket.emit('join');
+    }).catch(err => {
+      console.error('Error al obtener el stream de medios:', err);
+    });
 
     socket.on('me', (id) => {
       console.log('ID del usuario conectado:', id);
@@ -51,7 +51,14 @@ const VideoChat = () => {
     socket.on('partnerId', (id) => {
       console.log('Partner ID recibido:', id);
       setPartnerId(id);
-      startPeer(true); // Inicia el peer directamente
+      // Inicia el peer solo si ambos usuarios están conectados
+      if (isInitiator) {
+        console.log('Iniciando peer como iniciador');
+        startPeer(true);
+      } else {
+        console.log('Iniciando peer como no iniciador');
+        startPeer(false);
+      }
     });
 
     socket.on('message', (message) => {
@@ -59,12 +66,11 @@ const VideoChat = () => {
       setMessages(prevMessages => [...prevMessages, message]);
     });
 
-    socket.on('user-disconnected', (id) => {
-      console.log('Usuario desconectado:', id);
-    });
-
     return () => {
-      if (peer) peer.destroy();
+      if (peer) {
+        peer.destroy();
+        console.log('Peer destruido');
+      }
     };
   }, []);
 
@@ -80,18 +86,20 @@ const VideoChat = () => {
     };
 
     const interval = setInterval(() => {
-      if (modelsLoaded) detectFaces();
+      if (modelsLoaded) {
+        detectFaces();
+      }
     }, 100);
 
     return () => clearInterval(interval);
   }, [stream, modelsLoaded]);
 
   const startPeer = (initiator) => {
-    console.log('Iniciando peer, iniciador:', initiator);
+    console.log('Iniciando peer:', initiator);
     const newPeer = new Peer({ initiator, trickle: false, stream });
 
     newPeer.on('signal', (data) => {
-      console.log('Señal enviada:', data);
+      console.log('Enviando señal:', data);
       socket.emit('signal', { to: partnerId, signal: data });
     });
 
@@ -116,7 +124,7 @@ const VideoChat = () => {
 
   return (
     <div>
-      <h1>Video Chat</h1>
+      <h1>Video Chat con Reconocimiento Facial</h1>
       <video ref={myVideoRef} autoPlay muted style={{ width: '300px' }} />
       <video ref={userVideoRef} autoPlay style={{ width: '300px' }} />
       <div>
