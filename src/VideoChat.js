@@ -17,6 +17,8 @@ const VideoChat = () => {
   const [detections, setDetections] = useState(null);
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [partnerId, setPartnerId] = useState(""); // Almacena el ID del compañero
+  const [messages, setMessages] = useState([]); // Almacena los mensajes
+  const [messageInput, setMessageInput] = useState(""); // Almacena el mensaje actual
 
   // Cargar los modelos de face-api.js
   const loadModels = async () => {
@@ -53,10 +55,16 @@ const VideoChat = () => {
       console.log('Partner ID recibido:', id);
     });
 
+    // Escuchar mensajes entrantes
+    socket.on('message', (message) => {
+      setMessages(prevMessages => [...prevMessages, message]);
+    });
+
     // Limpiar el socket al desmontar el componente
     return () => {
       socket.off('me');
       socket.off('partnerId');
+      socket.off('message');
     };
   }, []);
 
@@ -104,9 +112,18 @@ const VideoChat = () => {
     setPeer(newPeer);
   };
 
+  const sendMessage = () => {
+    if (messageInput.trim() !== "") {
+      const message = { sender: me, text: messageInput };
+      socket.emit('message', message);
+      setMessages(prevMessages => [...prevMessages, message]);
+      setMessageInput(""); // Limpiar el campo de entrada
+    }
+  };
+
   return (
     <div>
-      <h1>BElxy Video Chat con Reconocimiento Facial</h1>
+      <h1>Video Chat con Reconocimiento Facial</h1>
 
       <video ref={myVideoRef} autoPlay muted style={{ width: '300px' }} />
       <video ref={userVideoRef} autoPlay style={{ width: '300px' }} />
@@ -120,6 +137,24 @@ const VideoChat = () => {
           <pre>{JSON.stringify(detections, null, 2)}</pre>
         </div>
       )}
+
+      <div>
+        <h2>Chat</h2>
+        <div style={{ border: '1px solid #ccc', padding: '10px', height: '200px', overflowY: 'scroll' }}>
+          {messages.map((msg, index) => (
+            <div key={index}>
+              <strong>{msg.sender}: </strong>{msg.text}
+            </div>
+          ))}
+        </div>
+        <input 
+          type="text" 
+          value={messageInput} 
+          onChange={(e) => setMessageInput(e.target.value)} 
+          placeholder="Escribe un mensaje..." 
+        />
+        <button onClick={sendMessage}>Enviar</button>
+      </div>
     </div>
   );
 };
