@@ -3,18 +3,9 @@ import Peer from 'simple-peer';
 import * as faceapi from 'face-api.js';
 import io from 'socket.io-client';
 
-// const socket = io.connect('http://localhost:5000');
 const socket = io("https://video-chat-backend2-becc66113081.herokuapp.com/", {
-  transports: ["websocket"], // Puedes probar con 'websocket' para ver si funciona mejor
+  transports: ["websocket"],
   secure: true
-});
-
-socket.on("connect", () => {
-  console.log("Conectado al servidor con socket.io");
-});
-
-socket.on('signal', (data) => {
-  console.log('Signal recibido:', data);
 });
 
 const VideoChat = () => {
@@ -24,19 +15,20 @@ const VideoChat = () => {
   const myVideoRef = useRef();
   const userVideoRef = useRef();
   const [detections, setDetections] = useState(null);
-  const [modelsLoaded, setModelsLoaded] = useState(false); // Estado para controlar la carga de modelos
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [partnerId, setPartnerId] = useState(""); // Estado para almacenar el ID del compañero
 
   // Cargar los modelos de face-api.js
   const loadModels = async () => {
     await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
     await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
     await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
-    setModelsLoaded(true); // Cambiar el estado a true una vez que los modelos se hayan cargado
+    setModelsLoaded(true);
     console.log('Modelos cargados');
   };
 
   useEffect(() => {
-    loadModels(); // Llama a loadModels al montar el componente
+    loadModels();
 
     navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
       setStream(stream);
@@ -48,34 +40,17 @@ const VideoChat = () => {
     socket.on('me', (id) => {
       setMe(id);
     });
+
+    socket.on('partnerId', (id) => {
+      setPartnerId(id); // Actualiza el ID del compañero al recibirlo del servidor
+    });
   }, []);
-
-  // Detectar rostros en tiempo real solo si los modelos están cargados
-  useEffect(() => {
-    const detectFaces = async () => {
-      if (myVideoRef.current && stream) {
-        const detections = await faceapi.detectAllFaces(
-          myVideoRef.current,
-          new faceapi.TinyFaceDetectorOptions()
-        ).withFaceLandmarks().withFaceDescriptors();
-        setDetections(detections);
-      }
-    };
-
-    const interval = setInterval(() => {
-      if (modelsLoaded) {
-        detectFaces(); // Ejecutar la detección solo si los modelos están cargados
-      }
-    }, 100);
-
-    return () => clearInterval(interval);
-  }, [stream, modelsLoaded]);
 
   const startPeer = (initiator) => {
     const newPeer = new Peer({ initiator, trickle: false, stream });
 
     newPeer.on('signal', (data) => {
-      socket.emit('signal', { to: "partner-id", signal: data });
+      socket.emit('signal', { to: partnerId, signal: data }); // Usa el partnerId aquí
     });
 
     newPeer.on('stream', (userStream) => {
@@ -93,7 +68,7 @@ const VideoChat = () => {
 
   return (
     <div>
-      <h1>4Video Chat con Reconocimiento Facial</h1>
+      <h1>Video Chat con Reconocimiento Facial</h1>
 
       <video ref={myVideoRef} autoPlay muted style={{ width: '300px' }} />
       <video ref={userVideoRef} autoPlay style={{ width: '300px' }} />
