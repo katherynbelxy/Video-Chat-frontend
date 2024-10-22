@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import Peer from 'peerjs';
 import io from 'socket.io-client';
 
-const socket = io('http://localhost:5000');
+// Conectar con el servidor de socket.io en Heroku
+const socket = io('https://video-chat-backend2-becc66113081.herokuapp.com/');
 
 const VideoChat = () => {
   const [me, setMe] = useState('');
@@ -21,11 +22,12 @@ const VideoChat = () => {
       }
     });
 
-    // Crear la instancia de PeerJS
+    // Crear la instancia de PeerJS conectada a tu servidor en Heroku
     const peer = new Peer(undefined, {
+      host: 'video-chat-backend2-becc66113081.herokuapp.com',
+      port: 443,
       path: '/peerjs',
-      host: 'localhost',
-      port: 5000,
+      secure: true,
     });
 
     peerInstance.current = peer;
@@ -40,7 +42,7 @@ const VideoChat = () => {
     });
 
     peer.on('call', (call) => {
-      call.answer(stream);
+      call.answer(stream); // Contestar la llamada con el flujo de video
       call.on('stream', (userStream) => {
         userVideo.current.srcObject = userStream;
       });
@@ -48,7 +50,7 @@ const VideoChat = () => {
   }, [stream]);
 
   const callUser = (id) => {
-    const call = peerInstance.current.call(id, stream);
+    const call = peerInstance.current.call(id, stream); // Llamar al usuario
     call.on('stream', (userStream) => {
       userVideo.current.srcObject = userStream;
     });
@@ -56,7 +58,7 @@ const VideoChat = () => {
 
   return (
     <div>
-      <h1>Video Chat si</h1>
+      <h1>Video Chat</h1>
       <video playsInline muted ref={myVideo} autoPlay style={{ width: '300px' }} />
       <video playsInline ref={userVideo} autoPlay style={{ width: '300px' }} />
 
