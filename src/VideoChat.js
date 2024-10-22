@@ -1,69 +1,164 @@
 import React, { useEffect, useRef, useState } from 'react';
-import Peer from 'peerjs';
+import Peer from 'simple-peer';
+import * as faceapi from 'face-api.js';
 import io from 'socket.io-client';
 
-// Conectar con el servidor de socket.io en Heroku
-const socket = io('https://video-chat-backend2-becc66113081.herokuapp.com/');
+const socket = io("https://video-chat-backend2-becc66113081.herokuapp.com/", {
+  transports: ["websocket"],
+  secure: true
+});
 
 const VideoChat = () => {
-  const [me, setMe] = useState('');
-  const [partnerId, setPartnerId] = useState('');
   const [stream, setStream] = useState(null);
-  const myVideo = useRef();
-  const userVideo = useRef();
-  const peerInstance = useRef(null);
+  const [me, setMe] = useState("");
+  const [peer, setPeer] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const myVideoRef = useRef();
+  const userVideoRef = useRef();
+  const [detections, setDetections] = useState(null);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [partnerId, setPartnerId] = useState("");
+  const [isInitiator, setIsInitiator] = useState(false); // Estado para controlar si es iniciador
+
+  const loadModels = async () => {
+    console.log('Cargando modelos de face-api...');
+    await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+    await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+    await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+    setModelsLoaded(true);
+    console.log('Modelos cargados');
+  };
 
   useEffect(() => {
-    // Obtener el flujo de video
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then((currentStream) => {
-      setStream(currentStream);
-      if (myVideo.current) {
-        myVideo.current.srcObject = currentStream;
+    loadModels();
+
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
+      console.log('Stream de medios obtenido');
+      setStream(stream);
+      myVideoRef.current.srcObject = stream;
+    }).catch(err => {
+      console.error('Error al obtener el stream de medios:', err);
+    });
+
+    socket.on('me', (id) => {
+      console.log('ID del usuario conectado:', id);
+      setMe(id);
+      socket.emit('join');
+    });
+
+    socket.on('partnerId', (id) => {
+      console.log('Partner ID recibido:', id);
+      setPartnerId(id);
+      // Inicia el peer solo si ambos usuarios están conectados
+      if (isInitiator) {
+        console.log('Iniciando peer como iniciador');
+        startPeer(true);
       }
     });
 
-    // Crear la instancia de PeerJS conectada a tu servidor en Heroku
-    const peer = new Peer(undefined, {
-      host: 'video-chat-backend2-becc66113081.herokuapp.com',
-      port: 443,
-      path: '/peerjs',
-      secure: true,
+    socket.on('message', (message) => {
+      console.log('Mensaje recibido:', message);
+      setMessages(prevMessages => [...prevMessages, message]);
     });
 
-    peerInstance.current = peer;
+    return () => {
+      if (peer) {
+        peer.destroy();
+        console.log('Peer destruido');
+      }
+    };
+  }, []);
 
-    peer.on('open', (id) => {
-      setMe(id);
-      socket.emit('join', id);
+  useEffect(() => {
+    const detectFaces = async () => {
+      if (myVideoRef.current && stream) {
+        const detections = await faceapi.detectAllFaces(
+          myVideoRef.current,
+          new faceapi.TinyFaceDetectorOptions()
+        ).withFaceLandmarks().withFaceDescriptors();
+        setDetections(detections);
+      }
+    };
+
+    const interval = setInterval(() => {
+      if (modelsLoaded) {
+        detectFaces();
+      }
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [stream, modelsLoaded]);
+
+  const startPeer = (initiator) => {
+    console.log('Iniciando peer:', initiator);
+    const newPeer = new Peer({ initiator, trickle: false, stream });
+
+    newPeer.on('signal', (data) => {
+      console.log('Enviando señal:', data);
+      socket.emit('signal', { to: partnerId, signal: data });
     });
 
-    socket.on('partnerId', (partnerId) => {
-      setPartnerId(partnerId);
+    newPeer.on('stream', (userStream) => {
+      console.log('Stream del usuario recibido');
+      userVideoRef.current.srcObject = userStream;
     });
 
-    peer.on('call', (call) => {
-      call.answer(stream); // Contestar la llamada con el flujo de video
-      call.on('stream', (userStream) => {
-        userVideo.current.srcObject = userStream;
-      });
+    socket.on('signal', (signalData) => {
+      console.log('Señal recibida de:', signalData.from);
+      newPeer.signal(signalData.signal);
     });
-  }, [stream]);
 
-  const callUser = (id) => {
-    const call = peerInstance.current.call(id, stream); // Llamar al usuario
-    call.on('stream', (userStream) => {
-      userVideo.current.srcObject = userStream;
-    });
+    setPeer(newPeer);
+  };
+
+  const sendMessage = (message) => {
+    console.log('Enviando mensaje:', message);
+    socket.emit('message', message);
+    setMessages(prevMessages => [...prevMessages, message]);
+  };
+
+  const handleInitiateCall = () => {
+    console.log('Botón "Iniciar llamada" presionado');
+    setIsInitiator(true);
+    startPeer(true); // Inicia el peer
+  };
+
+  const handleJoinCall = () => {
+    console.log('Botón "Unirse a llamada" presionado');
+    setIsInitiator(false);
+    startPeer(false); // Se une a la llamada
   };
 
   return (
     <div>
-      <h1>Video Chat</h1>
-      <video playsInline muted ref={myVideo} autoPlay style={{ width: '300px' }} />
-      <video playsInline ref={userVideo} autoPlay style={{ width: '300px' }} />
-
-      {partnerId && (
-        <button onClick={() => callUser(partnerId)}>Llamar a {partnerId}</button>
+      <h1>Video Chat con Reconocimiento Facial</h1>
+      <video ref={myVideoRef} autoPlay muted style={{ width: '300px' }} />
+      <video ref={userVideoRef} autoPlay style={{ width: '300px' }} />
+      <button onClick={handleInitiateCall}>Iniciar llamada</button>
+      <button onClick={handleJoinCall}>Unirse a llamada</button>
+      <div>
+        <h2>Chat de Texto</h2>
+        <input 
+          type="text" 
+          placeholder="Escribe un mensaje..." 
+          onKeyPress={(e) => {
+            if (e.key === 'Enter') {
+              sendMessage(e.target.value);
+              e.target.value = '';
+            }
+          }} 
+        />
+        <div>
+          {messages.map((msg, index) => (
+            <p key={index}>{msg}</p>
+          ))}
+        </div>
+      </div>
+      {detections && (
+        <div>
+          <h2>Detecciones:</h2>
+          <pre>{JSON.stringify(detections, null, 2)}</pre>
+        </div>
       )}
     </div>
   );
