@@ -24,7 +24,6 @@ const VideoChat = () => {
     await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
     await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
     setModelsLoaded(true);
-    console.log('Modelos cargados');
   };
 
   useEffect(() => {
@@ -32,9 +31,7 @@ const VideoChat = () => {
 
     navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
       setStream(stream);
-      if (myVideoRef.current) {
-        myVideoRef.current.srcObject = stream;
-      }
+      myVideoRef.current.srcObject = stream;
     });
 
     socket.on('me', (id) => {
@@ -44,14 +41,12 @@ const VideoChat = () => {
 
     socket.on('partnerId', (id) => {
       setPartnerId(id);
-      console.log('Partner ID recibido:', id);
     });
 
     socket.on('message', (message) => {
       setMessages(prevMessages => [...prevMessages, message]);
     });
 
-    // Cleanup on component unmount
     return () => {
       if (peer) {
         peer.destroy();
@@ -83,18 +78,11 @@ const VideoChat = () => {
     const newPeer = new Peer({ initiator, trickle: false, stream });
 
     newPeer.on('signal', (data) => {
-      console.log('Enviando señal:', data);
       socket.emit('signal', { to: partnerId, signal: data });
     });
 
     newPeer.on('stream', (userStream) => {
-      if (userVideoRef.current) {
-        userVideoRef.current.srcObject = userStream;
-      }
-    });
-
-    newPeer.on('error', (error) => {
-      console.error('Error en el peer:', error);
+      userVideoRef.current.srcObject = userStream;
     });
 
     socket.on('signal', (signalData) => {
@@ -111,14 +99,11 @@ const VideoChat = () => {
 
   return (
     <div>
-      <h1>9Video Chat con Reconocimiento Facial</h1>
-
+      <h1>Video Chat con Reconocimiento Facial</h1>
       <video ref={myVideoRef} autoPlay muted style={{ width: '300px' }} />
       <video ref={userVideoRef} autoPlay style={{ width: '300px' }} />
-
       <button onClick={() => startPeer(true)}>Iniciar llamada</button>
       <button onClick={() => startPeer(false)}>Unirse a llamada</button>
-
       <div>
         <h2>Chat de Texto</h2>
         <input 
@@ -137,7 +122,6 @@ const VideoChat = () => {
           ))}
         </div>
       </div>
-
       {detections && (
         <div>
           <h2>Detecciones:</h2>
