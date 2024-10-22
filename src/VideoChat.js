@@ -76,7 +76,6 @@ const VideoChat = () => {
           new faceapi.TinyFaceDetectorOptions()
         ).withFaceLandmarks().withFaceDescriptors();
         setDetections(detections);
-        console.log('Detecciones de rostro:', detections);
       }
     };
 
