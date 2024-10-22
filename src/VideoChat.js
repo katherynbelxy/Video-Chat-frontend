@@ -2,85 +2,67 @@ import React, { useEffect, useRef, useState } from 'react';
 import Peer from 'peerjs';
 import io from 'socket.io-client';
 
-const socket = io("https://video-chat-backend2-becc66113081.herokuapp.com/", {
-  transports: ["websocket"],
-  secure: true,
-});
+const socket = io('http://localhost:5000');
 
 const VideoChat = () => {
+  const [me, setMe] = useState('');
+  const [partnerId, setPartnerId] = useState('');
   const [stream, setStream] = useState(null);
-  const [me, setMe] = useState("");
-  const [partnerId, setPartnerId] = useState("");
-  const myVideoRef = useRef();
-  const userVideoRef = useRef();
+  const myVideo = useRef();
+  const userVideo = useRef();
   const peerInstance = useRef(null);
 
   useEffect(() => {
-    // Obtener acceso a la cámara y micrófono
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
-      setStream(stream);
-      if (myVideoRef.current) {
-        myVideoRef.current.srcObject = stream;
+    // Obtener el flujo de video
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then((currentStream) => {
+      setStream(currentStream);
+      if (myVideo.current) {
+        myVideo.current.srcObject = currentStream;
       }
     });
 
-    // Inicializar PeerJS y establecer conexión
-    const peer = new Peer();
+    // Crear la instancia de PeerJS
+    const peer = new Peer(undefined, {
+      path: '/peerjs',
+      host: 'localhost',
+      port: 5000,
+    });
+
     peerInstance.current = peer;
 
-    // Obtener el ID propio y conectarse al socket
-    peer.on('open', id => {
+    peer.on('open', (id) => {
       setMe(id);
-      console.log('Mi Peer ID:', id);
-      socket.emit('join', id);  // Enviar el ID al servidor
+      socket.emit('join', id);
     });
 
-    // Escuchar el ID del compañero desde el servidor
-    socket.on('partnerId', (id) => {
-      setPartnerId(id);
-      console.log('Partner ID recibido:', id);
+    socket.on('partnerId', (partnerId) => {
+      setPartnerId(partnerId);
     });
 
-    // Manejar la recepción de llamada
     peer.on('call', (call) => {
-      call.answer(stream); // Responder la llamada con tu propio stream
+      call.answer(stream);
       call.on('stream', (userStream) => {
-        if (userVideoRef.current) {
-          userVideoRef.current.srcObject = userStream;
-        }
+        userVideo.current.srcObject = userStream;
       });
     });
-
-    // Cleanup en el unmount
-    return () => {
-      if (peerInstance.current) {
-        peerInstance.current.destroy();
-      }
-    };
   }, [stream]);
 
-  const startCall = () => {
-    if (partnerId && peerInstance.current) {
-      const call = peerInstance.current.call(partnerId, stream); // Llamar al compañero
-      call.on('stream', (userStream) => {
-        if (userVideoRef.current) {
-          userVideoRef.current.srcObject = userStream;
-        }
-      });
-    }
+  const callUser = (id) => {
+    const call = peerInstance.current.call(id, stream);
+    call.on('stream', (userStream) => {
+      userVideo.current.srcObject = userStream;
+    });
   };
 
   return (
     <div>
-      <h1>Video Chat con PeerJS</h1>
+      <h1>Video Chat si</h1>
+      <video playsInline muted ref={myVideo} autoPlay style={{ width: '300px' }} />
+      <video playsInline ref={userVideo} autoPlay style={{ width: '300px' }} />
 
-      <video ref={myVideoRef} autoPlay muted style={{ width: '300px' }} />
-      <video ref={userVideoRef} autoPlay style={{ width: '300px' }} />
-
-      <button onClick={startCall}>Iniciar llamada</button>
-
-      <p>Mi ID: {me}</p>
-      <p>ID del compañero: {partnerId}</p>
+      {partnerId && (
+        <button onClick={() => callUser(partnerId)}>Llamar a {partnerId}</button>
+      )}
     </div>
   );
 };
