@@ -5,7 +5,7 @@ import io from 'socket.io-client';
 
 // const socket = io.connect('http://localhost:5000');
 const socket = io("https://video-chat-backend-theta.vercel.app", {
-  transports: ["polling"], // Puedes probar con 'websocket' para ver si funciona mejor
+  transports: ["websocket"], // Puedes probar con 'websocket' para ver si funciona mejor
   secure: true
 });
 
