@@ -1,165 +1,86 @@
 import React, { useEffect, useRef, useState } from 'react';
-import Peer from 'simple-peer';
-import * as faceapi from 'face-api.js';
+import Peer from 'peerjs';
 import io from 'socket.io-client';
 
 const socket = io("https://video-chat-backend2-becc66113081.herokuapp.com/", {
   transports: ["websocket"],
-  secure: true
+  secure: true,
 });
 
 const VideoChat = () => {
   const [stream, setStream] = useState(null);
   const [me, setMe] = useState("");
-  const [peer, setPeer] = useState(null);
-  const [messages, setMessages] = useState([]);
+  const [partnerId, setPartnerId] = useState("");
   const myVideoRef = useRef();
   const userVideoRef = useRef();
-  const [detections, setDetections] = useState(null);
-  const [modelsLoaded, setModelsLoaded] = useState(false);
-  const [partnerId, setPartnerId] = useState("");
-  const [isInitiator, setIsInitiator] = useState(false); // Estado para controlar si es iniciador
-
-  const loadModels = async () => {
-    console.log('Cargando modelos de face-api...');
-    await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
-    await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
-    await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
-    setModelsLoaded(true);
-    console.log('Modelos cargados');
-  };
+  const peerInstance = useRef(null);
 
   useEffect(() => {
-    loadModels();
-
+    // Obtener acceso a la cámara y micrófono
     navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
-      console.log('Stream de medios obtenido');
       setStream(stream);
-      myVideoRef.current.srcObject = stream;
-    }).catch(err => {
-      console.error('Error al obtener el stream de medios:', err);
+      if (myVideoRef.current) {
+        myVideoRef.current.srcObject = stream;
+      }
     });
 
-    socket.on('me', (id) => {
-      console.log('ID del usuario conectado:', id);
+    // Inicializar PeerJS y establecer conexión
+    const peer = new Peer();
+    peerInstance.current = peer;
+
+    // Obtener el ID propio y conectarse al socket
+    peer.on('open', id => {
       setMe(id);
-      socket.emit('join');
+      console.log('Mi Peer ID:', id);
+      socket.emit('join', id);  // Enviar el ID al servidor
     });
 
+    // Escuchar el ID del compañero desde el servidor
     socket.on('partnerId', (id) => {
-      console.log('Partner ID recibido:', id);
       setPartnerId(id);
-      // Inicia el peer solo si ambos usuarios están conectados
-      if (isInitiator) {
-        console.log('Iniciando peer como iniciador');
-        startPeer(true);
-      }
+      console.log('Partner ID recibido:', id);
     });
 
-    socket.on('message', (message) => {
-      console.log('Mensaje recibido:', message);
-      setMessages(prevMessages => [...prevMessages, message]);
+    // Manejar la recepción de llamada
+    peer.on('call', (call) => {
+      call.answer(stream); // Responder la llamada con tu propio stream
+      call.on('stream', (userStream) => {
+        if (userVideoRef.current) {
+          userVideoRef.current.srcObject = userStream;
+        }
+      });
     });
 
+    // Cleanup en el unmount
     return () => {
-      if (peer) {
-        peer.destroy();
-        console.log('Peer destruido');
+      if (peerInstance.current) {
+        peerInstance.current.destroy();
       }
     };
-  }, []);
+  }, [stream]);
 
-  useEffect(() => {
-    const detectFaces = async () => {
-      if (myVideoRef.current && stream) {
-        const detections = await faceapi.detectAllFaces(
-          myVideoRef.current,
-          new faceapi.TinyFaceDetectorOptions()
-        ).withFaceLandmarks().withFaceDescriptors();
-        setDetections(detections);
-      }
-    };
-
-    const interval = setInterval(() => {
-      if (modelsLoaded) {
-        detectFaces();
-      }
-    }, 100);
-
-    return () => clearInterval(interval);
-  }, [stream, modelsLoaded]);
-
-  const startPeer = (initiator) => {
-    console.log('Iniciando peer:', initiator);
-    const newPeer = new Peer({ initiator, trickle: false, stream });
-
-    newPeer.on('signal', (data) => {
-      console.log('Enviando señal:', data);
-      socket.emit('signal', { to: partnerId, signal: data });
-    });
-
-    newPeer.on('stream', (userStream) => {
-      console.log('Stream del usuario recibido');
-      userVideoRef.current.srcObject = userStream;
-    });
-
-    socket.on('signal', (signalData) => {
-      console.log('Señal recibida de:', signalData.from);
-      newPeer.signal(signalData.signal);
-    });
-
-    setPeer(newPeer);
-  };
-
-  const sendMessage = (message) => {
-    console.log('Enviando mensaje:', message);
-    socket.emit('message', message);
-    setMessages(prevMessages => [...prevMessages, message]);
-  };
-
-  const handleInitiateCall = () => {
-    console.log('Botón "Iniciar llamada" presionado');
-    setIsInitiator(true);
-    startPeer(true); // Inicia el peer
-  };
-
-  const handleJoinCall = () => {
-    console.log('Botón "Unirse a llamada" presionado');
-    setIsInitiator(false);
-    startPeer(false); // Se une a la llamada
+  const startCall = () => {
+    if (partnerId && peerInstance.current) {
+      const call = peerInstance.current.call(partnerId, stream); // Llamar al compañero
+      call.on('stream', (userStream) => {
+        if (userVideoRef.current) {
+          userVideoRef.current.srcObject = userStream;
+        }
+      });
+    }
   };
 
   return (
     <div>
-      <h1>LLVideo Chat con Reconocimiento Facial</h1>
+      <h1>Video Chat con PeerJS</h1>
+
       <video ref={myVideoRef} autoPlay muted style={{ width: '300px' }} />
       <video ref={userVideoRef} autoPlay style={{ width: '300px' }} />
-      <button onClick={handleInitiateCall}>Iniciar llamada</button>
-      <button onClick={handleJoinCall}>Unirse a llamada</button>
-      <div>
-        <h2>Chat de Texto</h2>
-        <input 
-          type="text" 
-          placeholder="Escribe un mensaje..." 
-          onKeyPress={(e) => {
-            if (e.key === 'Enter') {
-              sendMessage(e.target.value);
-              e.target.value = '';
-            }
-          }} 
-        />
-        <div>
-          {messages.map((msg, index) => (
-            <p key={index}>{msg}</p>
-          ))}
-        </div>
-      </div>
-      {detections && (
-        <div>
-          <h2>Detecciones:</h2>
-          <pre>{JSON.stringify(detections, null, 2)}</pre>
-        </div>
-      )}
+
+      <button onClick={startCall}>Iniciar llamada</button>
+
+      <p>Mi ID: {me}</p>
+      <p>ID del compañero: {partnerId}</p>
     </div>
   );
 };
