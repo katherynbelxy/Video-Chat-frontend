@@ -16,7 +16,7 @@ const VideoChat = () => {
   const userVideoRef = useRef();
   const [detections, setDetections] = useState(null);
   const [modelsLoaded, setModelsLoaded] = useState(false);
-  const [partnerId, setPartnerId] = useState(""); // Estado para almacenar el ID del compañero
+  const [partnerId, setPartnerId] = useState(""); // Almacena el ID del compañero
 
   // Cargar los modelos de face-api.js
   const loadModels = async () => {
@@ -37,20 +37,45 @@ const VideoChat = () => {
       }
     });
 
+    // Obtén el ID del usuario al conectarse
     socket.on('me', (id) => {
       setMe(id);
     });
 
+    // Escuchar el ID del compañero
     socket.on('partnerId', (id) => {
-      setPartnerId(id); // Actualiza el ID del compañero al recibirlo del servidor
+      setPartnerId(id);
+      console.log('Partner ID recibido:', id);
     });
   }, []);
+
+  // Detectar rostros en tiempo real solo si los modelos están cargados
+  useEffect(() => {
+    const detectFaces = async () => {
+      if (myVideoRef.current && stream) {
+        const detections = await faceapi.detectAllFaces(
+          myVideoRef.current,
+          new faceapi.TinyFaceDetectorOptions()
+        ).withFaceLandmarks().withFaceDescriptors();
+        setDetections(detections);
+      }
+    };
+
+    const interval = setInterval(() => {
+      if (modelsLoaded) {
+        detectFaces(); // Ejecutar la detección solo si los modelos están cargados
+      }
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [stream, modelsLoaded]);
 
   const startPeer = (initiator) => {
     const newPeer = new Peer({ initiator, trickle: false, stream });
 
     newPeer.on('signal', (data) => {
-      socket.emit('signal', { to: partnerId, signal: data }); // Usa el partnerId aquí
+      console.log('Enviando señal:', data);
+      socket.emit('signal', { to: partnerId, signal: data }); // Usar partnerId
     });
 
     newPeer.on('stream', (userStream) => {
@@ -60,6 +85,7 @@ const VideoChat = () => {
     });
 
     socket.on('signal', (signalData) => {
+      console.log('Signal recibido de:', signalData.to);
       newPeer.signal(signalData.signal);
     });
 
@@ -68,7 +94,7 @@ const VideoChat = () => {
 
   return (
     <div>
-      <h1>Video Chat con Reconocimiento Facial</h1>
+      <h1>final Video Chat con Reconocimiento Facial</h1>
 
       <video ref={myVideoRef} autoPlay muted style={{ width: '300px' }} />
       <video ref={userVideoRef} autoPlay style={{ width: '300px' }} />
