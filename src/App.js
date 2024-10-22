@@ -6,7 +6,7 @@ function App() {
   return (
     <div className="App">
       {/* Título de la aplicación */}
-      <h1>Video Chat con Reconocimiento Facial</h1>
+   
       
       {/* Componente de videochat */}
       <VideoChat />
