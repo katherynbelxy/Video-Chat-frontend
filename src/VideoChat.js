@@ -22,9 +22,9 @@ const VideoChat = () => {
 
   const loadModels = async () => {
     console.log('Cargando modelos de face-api...');
-    await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js/models');
-    await faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js/models');
-    await faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/npm/face-api.js/models');
+    await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+    await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+    await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
     setModelsLoaded(true);
     console.log('Modelos cargados');
   };
@@ -32,14 +32,16 @@ const VideoChat = () => {
   useEffect(() => {
     loadModels();
 
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
-      console.log('Stream de medios obtenido');
-      setStream(stream);
-      myVideoRef.current.srcObject = stream;
-      socket.emit('join');  // Emitir evento join al conectarse
-    }).catch(err => {
-      console.error('Error al obtener el stream de medios:', err);
-    });
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      .then(stream => {
+        console.log('Stream de medios obtenido');
+        setStream(stream);
+        myVideoRef.current.srcObject = stream;
+        socket.emit('join'); // Emitir evento join al conectarse
+      })
+      .catch(err => {
+        console.error('Error al obtener el stream de medios:', err);
+      });
 
     socket.on('me', (id) => {
       console.log('ID del usuario conectado:', id);
@@ -59,7 +61,6 @@ const VideoChat = () => {
 
     socket.on('user-disconnected', (id) => {
       console.log('Usuario desconectado:', id);
-      // Aquí puedes manejar la desconexión si es necesario
     });
 
     return () => {
@@ -116,7 +117,7 @@ const VideoChat = () => {
 
   return (
     <div>
-      <h1>si Video Chat con Reconocimiento Facial</h1>
+      <h1>Video Chat con Reconocimiento Facial</h1>
       <video ref={myVideoRef} autoPlay muted style={{ width: '300px' }} />
       <video ref={userVideoRef} autoPlay style={{ width: '300px' }} />
       <div>
