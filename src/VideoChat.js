@@ -18,38 +18,53 @@ const VideoChat = () => {
   const [detections, setDetections] = useState(null);
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [partnerId, setPartnerId] = useState("");
+  const [isInitiator, setIsInitiator] = useState(false); // Estado para controlar si es iniciador
 
   const loadModels = async () => {
+    console.log('Cargando modelos de face-api...');
     await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
     await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
     await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
     setModelsLoaded(true);
+    console.log('Modelos cargados');
   };
 
   useEffect(() => {
     loadModels();
 
     navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
+      console.log('Stream de medios obtenido');
       setStream(stream);
       myVideoRef.current.srcObject = stream;
+    }).catch(err => {
+      console.error('Error al obtener el stream de medios:', err);
     });
 
     socket.on('me', (id) => {
+      console.log('ID del usuario conectado:', id);
       setMe(id);
       socket.emit('join');
     });
 
     socket.on('partnerId', (id) => {
+      console.log('Partner ID recibido:', id);
       setPartnerId(id);
+      // Inicia el peer solo si ambos usuarios están conectados
+      if (isInitiator) {
+        console.log('Iniciando peer como iniciador');
+        startPeer(true);
+      }
     });
 
     socket.on('message', (message) => {
+      console.log('Mensaje recibido:', message);
       setMessages(prevMessages => [...prevMessages, message]);
     });
 
     return () => {
       if (peer) {
         peer.destroy();
+        console.log('Peer destruido');
       }
     };
   }, []);
@@ -75,17 +90,21 @@ const VideoChat = () => {
   }, [stream, modelsLoaded]);
 
   const startPeer = (initiator) => {
+    console.log('Iniciando peer:', initiator);
     const newPeer = new Peer({ initiator, trickle: false, stream });
 
     newPeer.on('signal', (data) => {
+      console.log('Enviando señal:', data);
       socket.emit('signal', { to: partnerId, signal: data });
     });
 
     newPeer.on('stream', (userStream) => {
+      console.log('Stream del usuario recibido');
       userVideoRef.current.srcObject = userStream;
     });
 
     socket.on('signal', (signalData) => {
+      console.log('Señal recibida de:', signalData.from);
       newPeer.signal(signalData.signal);
     });
 
@@ -93,8 +112,21 @@ const VideoChat = () => {
   };
 
   const sendMessage = (message) => {
+    console.log('Enviando mensaje:', message);
     socket.emit('message', message);
     setMessages(prevMessages => [...prevMessages, message]);
+  };
+
+  const handleInitiateCall = () => {
+    console.log('Botón "Iniciar llamada" presionado');
+    setIsInitiator(true);
+    startPeer(true); // Inicia el peer
+  };
+
+  const handleJoinCall = () => {
+    console.log('Botón "Unirse a llamada" presionado');
+    setIsInitiator(false);
+    startPeer(false); // Se une a la llamada
   };
 
   return (
@@ -102,8 +134,8 @@ const VideoChat = () => {
       <h1>Video Chat con Reconocimiento Facial</h1>
       <video ref={myVideoRef} autoPlay muted style={{ width: '300px' }} />
       <video ref={userVideoRef} autoPlay style={{ width: '300px' }} />
-      <button onClick={() => startPeer(true)}>Iniciar llamada</button>
-      <button onClick={() => startPeer(false)}>Unirse a llamada</button>
+      <button onClick={handleInitiateCall}>Iniciar llamada</button>
+      <button onClick={handleJoinCall}>Unirse a llamada</button>
       <div>
         <h2>Chat de Texto</h2>
         <input 
