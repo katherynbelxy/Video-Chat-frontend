@@ -30,12 +30,16 @@ const VideoChat = () => {
   useEffect(() => {
     loadModels();
 
-    navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(stream => {
-      setStream(stream);
-      if (myVideoRef.current) {
-        myVideoRef.current.srcObject = stream;
-      }
-    });
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      .then(stream => {
+        setStream(stream);
+        if (myVideoRef.current) {
+          myVideoRef.current.srcObject = stream; // Mostrar el video propio
+        }
+      })
+      .catch(err => {
+        console.error('Error al acceder a la cámara y el micrófono:', err);
+      });
 
     // Obtén el ID del usuario al conectarse
     socket.on('me', (id) => {
@@ -48,6 +52,12 @@ const VideoChat = () => {
       setPartnerId(id);
       console.log('Partner ID recibido:', id);
     });
+
+    // Limpiar el socket al desmontar el componente
+    return () => {
+      socket.off('me');
+      socket.off('partnerId');
+    };
   }, []);
 
   // Detectar rostros en tiempo real solo si los modelos están cargados
@@ -80,8 +90,9 @@ const VideoChat = () => {
     });
 
     newPeer.on('stream', (userStream) => {
+      console.log('Flujo de usuario recibido:', userStream);
       if (userVideoRef.current) {
-        userVideoRef.current.srcObject = userStream;
+        userVideoRef.current.srcObject = userStream; // Asignar el flujo del compañero al video
       }
     });
 
@@ -95,7 +106,7 @@ const VideoChat = () => {
 
   return (
     <div>
-      <h1>yes Video Chat con Reconocimiento Facial</h1>
+      <h1>BElxy Video Chat con Reconocimiento Facial</h1>
 
       <video ref={myVideoRef} autoPlay muted style={{ width: '300px' }} />
       <video ref={userVideoRef} autoPlay style={{ width: '300px' }} />
