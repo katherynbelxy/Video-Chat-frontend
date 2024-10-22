@@ -18,7 +18,7 @@ const VideoChat = () => {
   const [detections, setDetections] = useState(null);
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [partnerId, setPartnerId] = useState("");
-  const [isInitiator, setIsInitiator] = useState(false); // Estado para controlar si es iniciador
+  const [isConnected, setIsConnected] = useState(false); // Nuevo estado para verificar la conexión
 
   const loadModels = async () => {
     console.log('Cargando modelos de face-api...');
@@ -49,9 +49,9 @@ const VideoChat = () => {
     socket.on('partnerId', (id) => {
       console.log('Partner ID recibido:', id);
       setPartnerId(id);
-      // Inicia el peer solo si ambos usuarios están conectados
-      if (isInitiator) {
-        console.log('Iniciando peer como iniciador');
+      // Iniciar el peer automáticamente cuando se recibe un partnerId
+      if (!isConnected) {
+        console.log('Iniciando peer automáticamente');
         startPeer(true);
       }
     });
@@ -101,6 +101,7 @@ const VideoChat = () => {
     newPeer.on('stream', (userStream) => {
       console.log('Stream del usuario recibido');
       userVideoRef.current.srcObject = userStream;
+      setIsConnected(true); // Marcar como conectado
     });
 
     socket.on('signal', (signalData) => {
@@ -117,25 +118,11 @@ const VideoChat = () => {
     setMessages(prevMessages => [...prevMessages, message]);
   };
 
-  const handleInitiateCall = () => {
-    console.log('Botón "Iniciar llamada" presionado');
-    setIsInitiator(true);
-    startPeer(true); // Inicia el peer
-  };
-
-  const handleJoinCall = () => {
-    console.log('Botón "Unirse a llamada" presionado');
-    setIsInitiator(false);
-    startPeer(false); // Se une a la llamada
-  };
-
   return (
     <div>
       <h1>Video Chat con Reconocimiento Facial</h1>
       <video ref={myVideoRef} autoPlay muted style={{ width: '300px' }} />
       <video ref={userVideoRef} autoPlay style={{ width: '300px' }} />
-      <button onClick={handleInitiateCall}>Iniciar llamada</button>
-      <button onClick={handleJoinCall}>Unirse a llamada</button>
       <div>
         <h2>Chat de Texto</h2>
         <input 
