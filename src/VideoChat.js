@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Peer from 'simple-peer';
 import io from 'socket.io-client';
+import process from 'process'; // Importar polyfill para process
 
 const socket = io("https://video-chat-backend2-becc66113081.herokuapp.com/", {
   transports: ["websocket"],
