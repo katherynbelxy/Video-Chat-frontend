@@ -13,6 +13,9 @@ socket.on("connect", () => {
   console.log("Conectado al servidor con socket.io");
 });
 
+socket.on('signal', (data) => {
+  console.log('Signal recibido:', data);
+});
 
 const VideoChat = () => {
   const [stream, setStream] = useState(null);
