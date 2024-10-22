@@ -12,14 +12,13 @@ const VideoChat = () => {
   const [stream, setStream] = useState(null);
   const [me, setMe] = useState("");
   const [peer, setPeer] = useState(null);
-  const [messages, setMessages] = useState([]); // Estado para almacenar mensajes
+  const [messages, setMessages] = useState([]);
   const myVideoRef = useRef();
   const userVideoRef = useRef();
   const [detections, setDetections] = useState(null);
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [partnerId, setPartnerId] = useState("");
 
-  // Cargar los modelos de face-api.js
   const loadModels = async () => {
     await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
     await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
@@ -40,7 +39,7 @@ const VideoChat = () => {
 
     socket.on('me', (id) => {
       setMe(id);
-      socket.emit('join'); // Emitir evento 'join' al conectarse
+      socket.emit('join');
     });
 
     socket.on('partnerId', (id) => {
@@ -48,14 +47,18 @@ const VideoChat = () => {
       console.log('Partner ID recibido:', id);
     });
 
-    // Escuchar mensajes
     socket.on('message', (message) => {
       setMessages(prevMessages => [...prevMessages, message]);
     });
 
+    // Cleanup on component unmount
+    return () => {
+      if (peer) {
+        peer.destroy();
+      }
+    };
   }, []);
 
-  // Detectar rostros en tiempo real solo si los modelos están cargados
   useEffect(() => {
     const detectFaces = async () => {
       if (myVideoRef.current && stream) {
@@ -69,7 +72,7 @@ const VideoChat = () => {
 
     const interval = setInterval(() => {
       if (modelsLoaded) {
-        detectFaces(); // Ejecutar la detección solo si los modelos están cargados
+        detectFaces();
       }
     }, 100);
 
@@ -86,8 +89,12 @@ const VideoChat = () => {
 
     newPeer.on('stream', (userStream) => {
       if (userVideoRef.current) {
-        userVideoRef.current.srcObject = userStream; // Asignar el flujo del compañero al video
+        userVideoRef.current.srcObject = userStream;
       }
+    });
+
+    newPeer.on('error', (error) => {
+      console.error('Error en el peer:', error);
     });
 
     socket.on('signal', (signalData) => {
@@ -98,13 +105,13 @@ const VideoChat = () => {
   };
 
   const sendMessage = (message) => {
-    socket.emit('message', message); // Enviar el mensaje al backend
-    setMessages(prevMessages => [...prevMessages, message]); // Agregar el mensaje a la lista local
+    socket.emit('message', message);
+    setMessages(prevMessages => [...prevMessages, message]);
   };
 
   return (
     <div>
-      <h1>Final Video Chat con Reconocimiento Facial</h1>
+      <h1>9Video Chat con Reconocimiento Facial</h1>
 
       <video ref={myVideoRef} autoPlay muted style={{ width: '300px' }} />
       <video ref={userVideoRef} autoPlay style={{ width: '300px' }} />
@@ -120,7 +127,7 @@ const VideoChat = () => {
           onKeyPress={(e) => {
             if (e.key === 'Enter') {
               sendMessage(e.target.value);
-              e.target.value = ''; // Limpiar el input después de enviar
+              e.target.value = '';
             }
           }} 
         />
