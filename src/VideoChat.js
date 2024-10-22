@@ -117,7 +117,7 @@ const VideoChat = () => {
 
   return (
     <div>
-      <h1>Video Chat con Reconocimiento Facial</h1>
+      <h1>Video Chat</h1>
       <video ref={myVideoRef} autoPlay muted style={{ width: '300px' }} />
       <video ref={userVideoRef} autoPlay style={{ width: '300px' }} />
       <div>
